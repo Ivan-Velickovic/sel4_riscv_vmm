@@ -570,7 +570,7 @@ seL4_MessageInfo_t irq_server_wait_for_irq(irq_server_t irq_server, seL4_Word *b
 #define VMM_PRIO                (IRQSERVER_PRIO + 1)
 #define IRQ_MESSAGE_LABEL       0xCAFE
 #define IPI_MESSAGE_LABEL       0xBEEF
-#define IRQINJ_MESSAGE_LABLE    0xDEEF
+#define IRQINJ_MESSAGE_LABEL    0xDEEF
 
 #define MAX_IRQ             20 //256
 
@@ -609,7 +609,7 @@ struct fault {
     enum fault_width width;
     int content;
     uint32_t riscv_inst;
-    riscv_inst_t decoded_inst; 
+    riscv_inst_t decoded_inst;
 };
 
 typedef struct fault fault_t;
@@ -682,7 +682,7 @@ struct vm {
     void                    *entry_point;
     int                     ndevices;
     struct device           devices[MAX_DEVICES_PER_VM];
-}; 
+};
 
 /* allocator static pool */
 #define ALLOCATOR_STATIC_POOL_SIZE ((1 << seL4_PageBits) * 4000)
@@ -1101,7 +1101,7 @@ static void vmm_handler_thread(vm_t *vm, seL4_Word vcpu_index)
                     break;
                 }
 #ifndef CONFIG_DIRECT_VCPU_IRQ
-                case IRQINJ_MESSAGE_LABLE: {
+                case IRQINJ_MESSAGE_LABEL: {
                     int irq = seL4_GetMR(0);
                     seL4_RISCV_VCPU_ReadRegs_t res = seL4_RISCV_VCPU_ReadRegs(vcpu, seL4_VCPUReg_SIP);
                     assert(!res.error);
@@ -1621,7 +1621,7 @@ static void *map_device(vspace_t *vspace, vka_t *vka, simple_t *simple, uintptr_
         vka_cspace_free(vka, frame.capPtr);
         return NULL;
     }
-    DMAP("Mapped device ipa0x%lx->p0x%lx\n", vaddr, paddr);
+    DMAP("VMM|INFO: Mapped device ipa0x%lx->p0x%lx\n", vaddr, paddr);
     return vaddr;
 }
 
@@ -1666,7 +1666,7 @@ static void *map_emulated_device_pages(vm_t *vm, struct device *d)
         return NULL;
     }
     ret = vmm_addr;
-    DMAP("Mapping emulated device ipa0x%p size 0x%lx\n", vm_addr, size);
+    DMAP("VMM|INFO: Mapping emulated device ipa0x%p size 0x%lx\n", vm_addr, size);
     for (; remain_size > 0; remain_size -= 0x1000) {
         /* Create a frame (and a copy for the VMM) */
         err = vka_alloc_frame(vka, 12, &frame);
@@ -2229,7 +2229,7 @@ static int install_linux_devices(vm_t *vm)
         void (*handler)(struct irq_data *);
         handler = &irq_handler;
         if (irq_data == NULL) {
-            printf("register irq %d\n", (int)irq);
+            printf("VMM|INFO: Register IRQ %d\n", (int)irq);
             irq_data = irq_server_register_irq(_irq_server, irq, handler, NULL);
             if (!irq_data) {
                 printf("fail to register irq %d\n", (int)irq);
@@ -2474,7 +2474,7 @@ static void *load_linux(vm_t *vm, const char *kernel_name, const char *dtb_name)
         printf("Failed to get %s from CPIO\n", kernel_name);
         return NULL;
     }
-    printf("Found %s at %p len %ld %x\n", kernel_name, file, size, *(int *)file);
+    printf("VMM|INFO: Found \"%s\" at %p len %ld %x\n", kernel_name, file, size, *(int *)file);
     seL4_Word entry = RAM_BASE + 0x2000000;
     if (vm_copyout(vm, (void *)file, entry, size)) {
         printf("Failed to load %s\n", kernel_name);
@@ -2670,7 +2670,7 @@ static int handle_page_fault(vm_t *vm, fault_t *fault)
         }
     }
     addr -= (addr & 0xfff);
-    printf("Blindly map %lx to %lx\n", addr, addr);
+    printf("VMM|INFO: Blindly map %lx to %lx\n", addr, addr);
     map_vm_device(vm, addr, addr, seL4_AllRights);
     ignore_fault(fault);
     return err;
@@ -2932,16 +2932,16 @@ int main(void)
     err = install_linux_devices(&vm);
     assert(!err);
     /* Load system images */
-    printf("Loading Linux: \'%s\' dtb: \'%s\'\n", VM_LINUX_NAME, VM_LINUX_DTB_NAME);
+    printf("VMM|INFO: Loading Linux image: \'%s\' with DTB: \'%s\'\n", VM_LINUX_NAME, VM_LINUX_DTB_NAME);
     void *entry = load_linux(&vm, VM_LINUX_NAME, VM_LINUX_DTB_NAME);
     if (entry == NULL) {
         printf("Failed to load VM image\n");
         seL4_DebugHalt();
         return -1;
     }
-    vm_set_bootargs(&vm, (seL4_Word)entry, 0, DTB_ADDR); 
+    vm_set_bootargs(&vm, (seL4_Word)entry, 0, DTB_ADDR);
     /* Power on */
-    printf("Starting VM\n\n");
+    printf("VMM|INFO: Starting VM\n\n");
 
     err = vm_start(&vm);
 
